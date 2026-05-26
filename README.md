@@ -12,7 +12,7 @@ https://github.com/user-attachments/assets/1d0ee87a-e0a5-4bfa-a9b9-2f9144cb905b
 
 ## Features
 
-- **7 LLM-callable tools** — `TaskCreate`, `TaskList`, `TaskGet`, `TaskUpdate`, `TaskOutput`, `TaskStop`, `TaskExecute` — matching Claude Code's exact tool specs and descriptions
+- **7 LLM-callable tools** — `TaskCreate` (single + batch), `TaskList`, `TaskGet`, `TaskUpdate`, `TaskOutput`, `TaskStop`, `TaskExecute`
 - **Persistent widget** — live task list above the editor with `✔`/`◼`/`◻` status icons, task numbers (`#1`, `#2`, …), strikethrough for completed tasks, star spinner (`✳✽`) for active tasks with elapsed time and token counts
 - **System-reminder injection** — periodic `<system-reminder>` nudges injected into the upcoming LLM request (via the `context` hook, transient and never persisted) when task tools haven't been used recently (matches Claude Code's behavior exactly)
 - **Prompt guidelines** — workflow contract encoded in tool descriptions, nudging the LLM at the point of tool use
@@ -70,18 +70,53 @@ How tasks are sorted and how many are shown can be configured via `/tasks` → S
 
 ### `TaskCreate`
 
-Create a structured task. Used proactively for complex multi-step work.
+Create one or more structured tasks. Pass `subject` and `description` for a single task, or a `tasks` array for batch creation.
+
+**Single task** (backward compatible):
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `subject` | string | yes | Brief imperative title |
-| `description` | string | yes | Detailed context and acceptance criteria |
+| `subject` | string | yes* | Brief imperative title |
+| `description` | string | yes* | Detailed context and acceptance criteria |
 | `activeForm` | string | no | Present continuous form for spinner (e.g., "Running tests") |
 | `agentType` | string | no | Agent type for subagent execution (e.g., `"general-purpose"`, `"Explore"`) |
 | `metadata` | object | no | Arbitrary key-value pairs |
 
+*\*Required when not using `tasks`.*
+
+**Batch creation** (via `tasks` array):
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `tasks` | array | yes* | Array of task objects (min 1 item). Mutually exclusive with `subject`/`description`. |
+| `tasks[].subject` | string | yes | Brief imperative title |
+| `tasks[].description` | string | yes | Detailed context and acceptance criteria |
+| `tasks[].activeForm` | string | no | Present continuous form for spinner |
+| `tasks[].agentType` | string | no | Agent type for subagent execution via TaskExecute |
+| `tasks[].metadata` | object | no | Arbitrary key-value pairs |
+
+*\*Required when not using `subject`/`description`. You cannot mix `tasks` with `subject`/`description`.*
+
 ```
 → Task #1 created successfully: Fix authentication bug
+```
+
+Batch example:
+```json
+{
+  "tasks": [
+    { "subject": "Design the API", "description": "Decide the shape" },
+    { "subject": "Implement the handler", "description": "Write the code" },
+    { "subject": "Write tests", "description": "Cover edge cases" }
+  ]
+}
+```
+
+```
+→ Created 3 tasks:
+  #1 Design the API
+  #2 Implement the handler
+  #3 Write tests
 ```
 
 ### `TaskList`
@@ -315,7 +350,7 @@ If [`pi-subagents`](https://github.com/tintinweb/pi-subagents) is not installed,
 src/
 ├── index.ts            # Extension entry: 7 tools + /tasks command + widget + subagent integration
 ├── types.ts            # Task, TaskStatus, BackgroundProcess types
-├── task-store.ts       # File-backed store with CRUD, dependencies, locking
+├── task-store.ts       # File-backed store with CRUD, batch creation, dependencies, locking
 ├── auto-clear.ts       # Turn-based auto-clearing of completed tasks (AutoClearManager)
 ├── tasks-config.ts     # Config persistence (taskScope, autoCascade, autoClearCompleted) → .pi/tasks-config.json
 ├── process-tracker.ts  # Background process output buffering and stop
